@@ -38,6 +38,34 @@ All mutating operations are **idempotent** (via `referenceID` in payload) and ex
 └─────────────────────────────────────────────────────────────────────────────┘
 ```
 
+<details>
+<summary>Mermaid version</summary>
+
+```mermaid
+flowchart TB
+    subgraph Service["User Management Service"]
+        Client([Client])
+        API[API Server]
+        Redis[(Redis<br/>Idempotency)]
+        
+        subgraph Temporal["Temporal Server"]
+            Queue[Workflow Queue]
+        end
+        
+        Worker[Worker<br/>same binary]
+        MySQL[(MySQL)]
+    end
+    
+    Client -->|HTTP Request| API
+    API -->|Start Workflow| Queue
+    API -->|Check/Store referenceID| Redis
+    Queue -->|Execute| Worker
+    Worker -->|Read/Write| MySQL
+    Client -.->|Poll Status| API
+```
+
+</details>
+
 ## API Flow
 
 ```
@@ -63,6 +91,32 @@ All mutating operations are **idempotent** (via `referenceID` in payload) and ex
     │◀──────────────────────────┤                         │                        │
     │                           │                         │                        │
 ```
+
+<details>
+<summary>Mermaid version</summary>
+
+```mermaid
+sequenceDiagram
+    participant C as Client
+    participant A as API Server
+    participant T as Temporal
+    participant W as Worker
+
+    C->>A: POST /users<br/>{referenceID: "abc"}
+    A->>T: Start Workflow<br/>(ID = referenceID)
+    A-->>C: 202 Accepted<br/>{workflowID: "abc"}
+    
+    T->>W: Execute Workflow
+    W->>W: Run Activities
+    W-->>T: Complete
+    
+    C->>A: GET /workflows/abc
+    A->>T: Query Status
+    T-->>A: Status + Result
+    A-->>C: {status: "completed"}
+```
+
+</details>
 
 ## API Endpoints
 
