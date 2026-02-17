@@ -1,0 +1,4 @@
+# This folder contains sqlc-generated code
+# Initial files are scaffolded from templates
+# You can regenerate them by running: make sqlc-generate
+# Do not manually edit generated files

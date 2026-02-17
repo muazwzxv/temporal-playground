@@ -1,0 +1,127 @@
+services:
+  mysql:
+    image: mysql:8.0
+    container_name: user-management-mysql
+    environment:
+      MYSQL_ROOT_PASSWORD: rootpassword
+      MYSQL_DATABASE: user-management
+      MYSQL_USER: appuser
+      MYSQL_PASSWORD: apppassword
+    ports:
+      - "3306:3306"
+    volumes:
+      - user-management-mysql-data:/var/lib/mysql
+    command: --character-set-server=utf8mb4 --collation-server=utf8mb4_unicode_ci
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-u", "root", "-prootpassword"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - user-management-network
+
+  redis:
+    image: redis:7-alpine
+    container_name: user-management-redis
+    ports:
+      - "6379:6379"
+    volumes:
+      - user-management-redis-data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - user-management-network
+
+
+  kafka:
+    image: confluentinc/cp-kafka:7.6.0
+    container_name: user-management-kafka
+    hostname: kafka
+    environment:
+      # KRaft mode configuration
+      KAFKA_NODE_ID: 1
+      KAFKA_PROCESS_ROLES: broker,controller
+      KAFKA_CONTROLLER_QUORUM_VOTERS: 1@kafka:9093
+      KAFKA_CONTROLLER_LISTENER_NAMES: CONTROLLER
+      # Listeners - INTERNAL for docker network, EXTERNAL for host
+      KAFKA_LISTENERS: PLAINTEXT://0.0.0.0:9092,CONTROLLER://0.0.0.0:9093,INTERNAL://0.0.0.0:29092
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://localhost:9092,INTERNAL://kafka:29092
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: PLAINTEXT:PLAINTEXT,CONTROLLER:PLAINTEXT,INTERNAL:PLAINTEXT
+      KAFKA_INTER_BROKER_LISTENER_NAME: INTERNAL
+      # Auto topic creation
+      KAFKA_AUTO_CREATE_TOPICS_ENABLE: "true"
+      # Cluster ID for KRaft
+      CLUSTER_ID: MkU3OEVBNTcwNTJENDM2Qk
+      # Log directories
+      KAFKA_LOG_DIRS: /var/lib/kafka/data
+    ports:
+      - "9092:9092"
+    volumes:
+      - user-management-kafka-data:/var/lib/kafka/data
+    healthcheck:
+      test: ["CMD-SHELL", "kafka-broker-api-versions --bootstrap-server localhost:9092 || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+    networks:
+      - user-management-network
+
+  kafka-ui:
+    image: provectuslabs/kafka-ui:latest
+    container_name: user-management-kafka-ui
+    environment:
+      KAFKA_CLUSTERS_0_NAME: local
+      KAFKA_CLUSTERS_0_BOOTSTRAPSERVERS: kafka:29092
+      DYNAMIC_CONFIG_ENABLED: "true"
+    ports:
+      - "8090:8080"
+    depends_on:
+      kafka:
+        condition: service_healthy
+    networks:
+      - user-management-network
+
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: user-management:latest
+    container_name: user-management-app
+    env_file:
+      - .env.docker
+    ports:
+      - "8080:8080"
+    depends_on:
+      mysql:
+        condition: service_healthy
+
+      redis:
+        condition: service_healthy
+
+
+      kafka:
+        condition: service_healthy
+
+    networks:
+      - user-management-network
+    restart: unless-stopped
+
+volumes:
+  user-management-mysql-data:
+    driver: local
+
+  user-management-redis-data:
+    driver: local
+
+
+  user-management-kafka-data:
+    driver: local
+
+
+networks:
+  user-management-network:
+    driver: bridge

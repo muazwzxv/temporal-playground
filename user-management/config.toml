@@ -1,0 +1,20 @@
+[server]
+host = "0.0.0.0"
+port = 8080
+log_level = "info"  # Options: trace, debug, info, warn, error, fatal, panic
+read_timeout = "5s"
+write_timeout = "10s"
+body_limit = 4194304  # 4MB
+prefork = false
+
+[database]
+host = "localhost"
+port = 3306
+user = "appuser"
+password = "apppassword"
+database = "user-management"
+max_open_conns = 25
+max_idle_conns = 10
+conn_max_lifetime = "5m"
+retry_attempts = 3
+retry_backoff = "2s"
