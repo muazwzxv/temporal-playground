@@ -1,4 +1,4 @@
-package worker
+package main
 
 import (
 	"context"
@@ -11,6 +11,8 @@ import (
 	"go.temporal.io/sdk/worker"
 )
 
+// With your Activity and Workflow defined, you need a Worker to execute them. A Worker polls a Task Queue, that you configure it to poll,
+// looking for work to do. Once the Worker dequeues a Workflow or Activity task from the Task Queue, it then executes that task.
 func main() {
 	c, err := client.Dial(client.Options{})
 	if err != nil {
