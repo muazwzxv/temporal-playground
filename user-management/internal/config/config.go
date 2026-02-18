@@ -13,6 +13,14 @@ import (
 type Config struct {
 	Server   ServerConfig   `mapstructure:"server"`
 	Database DatabaseConfig `mapstructure:"database"`
+	Temporal TemporalConfig `mapstructure:"temporal"`
+}
+
+// TemporalConfig holds Temporal worker configuration
+type TemporalConfig struct {
+	Host      string `mapstructure:"host"`
+	Namespace string `mapstructure:"namespace"`
+	QueueName string `mapstructure:"queue_name"`
 }
 
 // ServerConfig holds Fiber server configuration
@@ -113,6 +121,11 @@ func setDefaults(v *viper.Viper) {
 	v.SetDefault("database.conn_max_lifetime", "5m")
 	v.SetDefault("database.retry_attempts", 3)
 	v.SetDefault("database.retry_backoff", "2s")
+
+	// Temporal defaults
+	v.SetDefault("temporal.host", "localhost:7233")
+	v.SetDefault("temporal.namespace", "default")
+	v.SetDefault("temporal.queue_name", "user-management-queue")
 }
 
 // Load reads configuration from a TOML file (backward compatibility).

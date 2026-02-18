@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"os"
+	"os/signal"
 	"strings"
 	"syscall"
 
@@ -11,7 +12,6 @@ import (
 	"github.com/gofiber/fiber/v2/log"
 	"github.com/gofiber/fiber/v2/middleware/logger"
 	"github.com/gofiber/fiber/v2/middleware/recover"
-	"github.com/samber/do/v2"
 	"github.com/muazwzxv/user-management/internal/config"
 	"github.com/muazwzxv/user-management/internal/database"
 	"github.com/muazwzxv/user-management/internal/database/store"
@@ -20,6 +20,10 @@ import (
 	userHandler "github.com/muazwzxv/user-management/internal/handler/user"
 	"github.com/muazwzxv/user-management/internal/repository"
 	service "github.com/muazwzxv/user-management/internal/service/user"
+	"github.com/samber/do/v2"
+	"go.temporal.io/sdk/client"
+	"go.temporal.io/sdk/worker"
+	"golang.org/x/sync/errgroup"
 )
 
 // Application represents the main application with dependency injection
@@ -157,10 +161,63 @@ func RegisterRoutes(app *fiber.App, injector do.Injector) {
 	do.MustInvoke[*userHandler.UserHandler](injector).RegisterRoutes(app)
 }
 
-// Start starts the HTTP server and handles graceful shutdown
-func (a *Application) Start() error {
+type RunMode string
+
+const (
+	RunModeHTTP   RunMode = "http"
+	RunModeWorker RunMode = "worker"
+	RunModeBoth   RunMode = "both"
+)
+
+// StartWorker starts the Temporal worker with graceful shutdown support
+func (a *Application) StartWorker(ctx context.Context) error {
+	log.Infow("temporal config",
+		"config", a.config.Temporal)
+
+	c, err := client.Dial(client.Options{
+		HostPort:  a.config.Temporal.Host,
+		Namespace: a.config.Temporal.Namespace,
+	})
+	if err != nil {
+		return fmt.Errorf("create temporal client: %w", err)
+	}
+	defer c.Close()
+
+	w := worker.New(c, a.config.Temporal.QueueName, worker.Options{})
+
+	// TODO: Register workflows and activities here
+	// w.RegisterWorkflow(YourWorkflow)
+	// w.RegisterActivity(YourActivity)
+
+	log.Infow("starting temporal worker",
+		"host", a.config.Temporal.Host,
+		"namespace", a.config.Temporal.Namespace,
+		"queue", a.config.Temporal.QueueName)
+
+	// Start worker in goroutine
+	errChan := make(chan error, 1)
+	go func() {
+		errChan <- w.Run(worker.InterruptCh())
+	}()
+
+	// Wait for context cancellation or worker error
+	select {
+	case <-ctx.Done():
+		log.Info("shutting down temporal worker")
+		w.Stop()
+		return nil
+	case err := <-errChan:
+		if err != nil {
+			return fmt.Errorf("worker error: %w", err)
+		}
+		return nil
+	}
+}
+
+// StartHTTP starts the HTTP server with graceful shutdown support
+func (a *Application) StartHTTP(ctx context.Context) error {
 	addr := fmt.Sprintf("%s:%d", a.config.Server.Host, a.config.Server.Port)
-	log.Infow("application starting server",
+	log.Infow("starting http server",
 		"address", addr,
 		"host", a.config.Server.Host,
 		"port", a.config.Server.Port)
@@ -173,24 +230,73 @@ func (a *Application) Start() error {
 		}
 	}()
 
-	// Handle graceful shutdown with DI container
-	go func() {
-		// ShutdownOnSignals blocks until signal is received
-		signal, _ := a.injector.RootScope().ShutdownOnSignals(syscall.SIGTERM, os.Interrupt)
-		log.Infow("application received shutdown signal",
-			"signal", signal)
-		
-		// Shutdown Fiber server
+	// Wait for context cancellation or server error
+	select {
+	case <-ctx.Done():
+		log.Info("shutting down http server")
 		if err := a.app.Shutdown(); err != nil {
-			log.Errorw("application shutdown error",
-				"error", err)
+			log.Errorw("http server shutdown error", "error", err)
 		}
-		
-		log.Info("application shutdown complete")
-		errChan <- nil
-	}()
+		// Shutdown DI container
+		if err := a.injector.Shutdown(); err != nil {
+			log.Errorw("di container shutdown error", "error", err)
+		}
+		return nil
+	case err := <-errChan:
+		return err
+	}
+}
 
-	return <-errChan
+// Start runs the application based on the specified mode with graceful shutdown
+func (a *Application) Start(ctx context.Context, mode RunMode) error {
+	// Create a cancellable context for coordinated shutdown
+	ctx, cancel := context.WithCancel(ctx)
+	defer cancel()
+
+	// Setup signal handling
+	sigChan := make(chan os.Signal, 1)
+	signal.Notify(sigChan, syscall.SIGINT, syscall.SIGTERM)
+
+	g, ctx := errgroup.WithContext(ctx)
+
+	switch mode {
+	case RunModeHTTP:
+		g.Go(func() error {
+			return a.StartHTTP(ctx)
+		})
+	case RunModeWorker:
+		g.Go(func() error {
+			return a.StartWorker(ctx)
+		})
+	case RunModeBoth:
+		g.Go(func() error {
+			return a.StartHTTP(ctx)
+		})
+		g.Go(func() error {
+			return a.StartWorker(ctx)
+		})
+	default:
+		return fmt.Errorf("unknown run mode: %s", mode)
+	}
+
+	// Wait for shutdown signal in a separate goroutine
+	g.Go(func() error {
+		select {
+		case sig := <-sigChan:
+			log.Infow("received shutdown signal", "signal", sig)
+			cancel()
+			return nil
+		case <-ctx.Done():
+			return nil
+		}
+	})
+
+	if err := g.Wait(); err != nil {
+		return fmt.Errorf("application error: %w", err)
+	}
+
+	log.Info("application shutdown complete")
+	return nil
 }
 
 // Init initializes the application with config loaded from default locations
