@@ -2,9 +2,8 @@
 package request
 
 type CreateUserRequest struct {
+	ReferenceID string `json:"referenceID" validate:"required,min=1,max=36"`
 	Name        string `json:"name" validate:"required,min=1,max=255"`
-	Description string `json:"description" validate:"max=1000"`
-	Status      string `json:"status" validate:"omitempty,oneof=active inactive archived"`
 }
 
 type UpdateUserRequest struct {

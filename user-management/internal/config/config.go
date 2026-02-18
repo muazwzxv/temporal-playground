@@ -14,6 +14,21 @@ type Config struct {
 	Server   ServerConfig   `mapstructure:"server"`
 	Database DatabaseConfig `mapstructure:"database"`
 	Temporal TemporalConfig `mapstructure:"temporal"`
+	Redis    RedisConfig    `mapstructure:"redis"`
+}
+
+// RedisConfig holds Redis configuration
+type RedisConfig struct {
+	Host         string        `mapstructure:"host"`
+	Port         int           `mapstructure:"port"`
+	Password     string        `mapstructure:"password"`
+	DB           int           `mapstructure:"db"`
+	MaxRetries   int           `mapstructure:"max_retries"`
+	PoolSize     int           `mapstructure:"pool_size"`
+	MinIdleConns int           `mapstructure:"min_idle_conns"`
+	DialTimeout  time.Duration `mapstructure:"dial_timeout"`
+	ReadTimeout  time.Duration `mapstructure:"read_timeout"`
+	WriteTimeout time.Duration `mapstructure:"write_timeout"`
 }
 
 // TemporalConfig holds Temporal worker configuration
@@ -126,6 +141,18 @@ func setDefaults(v *viper.Viper) {
 	v.SetDefault("temporal.host", "localhost:7233")
 	v.SetDefault("temporal.namespace", "default")
 	v.SetDefault("temporal.queue_name", "user-management-queue")
+
+	// Redis defaults
+	v.SetDefault("redis.host", "localhost")
+	v.SetDefault("redis.port", 6379)
+	v.SetDefault("redis.password", "")
+	v.SetDefault("redis.db", 0)
+	v.SetDefault("redis.max_retries", 3)
+	v.SetDefault("redis.pool_size", 10)
+	v.SetDefault("redis.min_idle_conns", 5)
+	v.SetDefault("redis.dial_timeout", "5s")
+	v.SetDefault("redis.read_timeout", "3s")
+	v.SetDefault("redis.write_timeout", "3s")
 }
 
 // Load reads configuration from a TOML file (backward compatibility).

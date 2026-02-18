@@ -25,7 +25,7 @@ func (h *UserHandler) CreateUser(c *fiber.Ctx) error {
 
 	logger.Infow("creating user",
 		"name", req.Name,
-		"status", req.Status)
+		"referenceID", req.ReferenceID)
 
 	result, err := h.service.CreateUser(c.Context(), req)
 	if err != nil {

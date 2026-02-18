@@ -18,11 +18,12 @@ import (
 	"github.com/muazwzxv/user-management/internal/handler"
 	healthHandler "github.com/muazwzxv/user-management/internal/handler/health"
 	userHandler "github.com/muazwzxv/user-management/internal/handler/user"
+	"github.com/muazwzxv/user-management/internal/redis"
 	"github.com/muazwzxv/user-management/internal/repository"
 	service "github.com/muazwzxv/user-management/internal/service/user"
+	"github.com/muazwzxv/user-management/internal/worker"
+	userWorkflow "github.com/muazwzxv/user-management/internal/worker/user"
 	"github.com/samber/do/v2"
-	"go.temporal.io/sdk/client"
-	"go.temporal.io/sdk/worker"
 	"golang.org/x/sync/errgroup"
 )
 
@@ -57,6 +58,9 @@ func NewApplication(cfg *config.Config) (*Application, error) {
 	do.Provide(injector, NewDatabase)
 	do.Provide(injector, NewFiberApp)
 	do.Provide(injector, NewQueries)
+	do.Provide(injector, NewRedis)
+	do.Provide(injector, worker.NewWorker)
+	do.Provide(injector, userWorkflow.NewUserWorkflowRegistrar)
 
 	// Provide repositories
 	do.Provide(injector, repository.NewUserRepository)
@@ -68,15 +72,16 @@ func NewApplication(cfg *config.Config) (*Application, error) {
 	do.Provide(injector, healthHandler.NewHealthHandler)
 	do.Provide(injector, userHandler.NewUserHandler)
 
-	// Invoke fiber app to initialize it and register routes
 	app := do.MustInvoke[*fiber.App](injector)
+
+	do.MustInvoke[*redis.Client](injector)
 
 	// Register all routes
 	RegisterRoutes(app, injector)
 
 	log.Infow("application initialized successfully",
 		"di_enabled", true,
-		"providers_count", 8)
+		"providers_count", 9)
 
 	return &Application{
 		injector: injector,
@@ -154,6 +159,26 @@ func NewQueries(i do.Injector) (*store.Queries, error) {
 	return store.New(), nil
 }
 
+// NewRedis creates a new Redis client from config
+func NewRedis(i do.Injector) (*redis.Client, error) {
+	cfg := do.MustInvoke[*config.Config](i)
+
+	redisCfg := &redis.Config{
+		Host:         cfg.Redis.Host,
+		Port:         cfg.Redis.Port,
+		Password:     cfg.Redis.Password,
+		DB:           cfg.Redis.DB,
+		MaxRetries:   cfg.Redis.MaxRetries,
+		PoolSize:     cfg.Redis.PoolSize,
+		MinIdleConns: cfg.Redis.MinIdleConns,
+		DialTimeout:  cfg.Redis.DialTimeout,
+		ReadTimeout:  cfg.Redis.ReadTimeout,
+		WriteTimeout: cfg.Redis.WriteTimeout,
+	}
+
+	return redis.NewClient(context.Background(), redisCfg)
+}
+
 // RegisterRoutes registers all HTTP routes by invoking handlers from DI container
 func RegisterRoutes(app *fiber.App, injector do.Injector) {
 	// Invoke handlers from DI container and register their routes
@@ -168,51 +193,6 @@ const (
 	RunModeWorker RunMode = "worker"
 	RunModeBoth   RunMode = "both"
 )
-
-// StartWorker starts the Temporal worker with graceful shutdown support
-func (a *Application) StartWorker(ctx context.Context) error {
-	log.Infow("temporal config",
-		"config", a.config.Temporal)
-
-	c, err := client.Dial(client.Options{
-		HostPort:  a.config.Temporal.Host,
-		Namespace: a.config.Temporal.Namespace,
-	})
-	if err != nil {
-		return fmt.Errorf("create temporal client: %w", err)
-	}
-	defer c.Close()
-
-	w := worker.New(c, a.config.Temporal.QueueName, worker.Options{})
-
-	// TODO: Register workflows and activities here
-	// w.RegisterWorkflow(YourWorkflow)
-	// w.RegisterActivity(YourActivity)
-
-	log.Infow("starting temporal worker",
-		"host", a.config.Temporal.Host,
-		"namespace", a.config.Temporal.Namespace,
-		"queue", a.config.Temporal.QueueName)
-
-	// Start worker in goroutine
-	errChan := make(chan error, 1)
-	go func() {
-		errChan <- w.Run(worker.InterruptCh())
-	}()
-
-	// Wait for context cancellation or worker error
-	select {
-	case <-ctx.Done():
-		log.Info("shutting down temporal worker")
-		w.Stop()
-		return nil
-	case err := <-errChan:
-		if err != nil {
-			return fmt.Errorf("worker error: %w", err)
-		}
-		return nil
-	}
-}
 
 // StartHTTP starts the HTTP server with graceful shutdown support
 func (a *Application) StartHTTP(ctx context.Context) error {
@@ -266,14 +246,20 @@ func (a *Application) Start(ctx context.Context, mode RunMode) error {
 		})
 	case RunModeWorker:
 		g.Go(func() error {
-			return a.StartWorker(ctx)
+			w := do.MustInvoke[*worker.Worker](a.injector)
+			registrar := do.MustInvoke[*userWorkflow.UserWorkflowRegistrar](a.injector)
+			w.RegisterWorkflows(registrar)
+			return w.Start(ctx)
 		})
 	case RunModeBoth:
 		g.Go(func() error {
 			return a.StartHTTP(ctx)
 		})
 		g.Go(func() error {
-			return a.StartWorker(ctx)
+			w := do.MustInvoke[*worker.Worker](a.injector)
+			registrar := do.MustInvoke[*userWorkflow.UserWorkflowRegistrar](a.injector)
+			w.RegisterWorkflows(registrar)
+			return w.Start(ctx)
 		})
 	default:
 		return fmt.Errorf("unknown run mode: %s", mode)

@@ -10,13 +10,9 @@ import (
 )
 
 type Querier interface {
-	CountUsers(ctx context.Context, db DBTX) (int64, error)
 	CreateUser(ctx context.Context, db DBTX, arg CreateUserParams) (sql.Result, error)
-	DeleteUser(ctx context.Context, db DBTX, id int64) error
-	GetUserByID(ctx context.Context, db DBTX, id int64) (*User, error)
-	GetUsersByStatus(ctx context.Context, db DBTX, status string) ([]*User, error)
+	GetUserByUUID(ctx context.Context, db DBTX, userUuid string) (*User, error)
 	ListUsers(ctx context.Context, db DBTX, arg ListUsersParams) ([]*User, error)
-	UpdateUser(ctx context.Context, db DBTX, arg UpdateUserParams) error
 }
 
 var _ Querier = (*Queries)(nil)

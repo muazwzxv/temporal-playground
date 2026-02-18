@@ -36,10 +36,6 @@ type DBConfig struct {
 }
 
 func NewDatabase(ctx context.Context, cfg *DBConfig) (*Database, error) {
-	if err := validateConfig(cfg); err != nil {
-		return nil, fmt.Errorf("%w: %v", ErrConfigInvalid, err)
-	}
-
 	dsn, err := buildDSN(cfg)
 	if err != nil {
 		return nil, fmt.Errorf("build DSN: %w", err)
@@ -110,40 +106,6 @@ func (d *Database) HealthCheck() error {
 		return fmt.Errorf("database health check failed: %w", err)
 	}
 
-	return nil
-}
-
-func validateConfig(cfg *DBConfig) error {
-	if cfg == nil {
-		return errors.New("config is nil")
-	}
-	if cfg.Host == "" {
-		return errors.New("host is required")
-	}
-	if cfg.User == "" {
-		return errors.New("user is required")
-	}
-	if cfg.Database == "" {
-		return errors.New("database is required")
-	}
-	if cfg.Port <= 0 || cfg.Port > 65535 {
-		return errors.New("port must be between 1 and 65535")
-	}
-	if cfg.MaxOpenConns < 0 {
-		return errors.New("max open connections cannot be negative")
-	}
-	if cfg.MaxIdleConns < 0 {
-		return errors.New("max idle connections cannot be negative")
-	}
-	if cfg.ConnMaxLifetime < 0 {
-		return errors.New("connection max lifetime cannot be negative")
-	}
-	if cfg.RetryAttempts < 0 {
-		return errors.New("retry attempts cannot be negative")
-	}
-	if cfg.RetryBackoff < 0 {
-		return errors.New("retry backoff cannot be negative")
-	}
 	return nil
 }
 

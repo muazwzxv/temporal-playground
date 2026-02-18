@@ -11,6 +11,9 @@ const (
 	UserStatusActive   UserStatus = "active"
 	UserStatusInactive UserStatus = "inactive"
 	UserStatusArchived UserStatus = "archived"
+
+	// used for redis cache idempotency
+	UserStatusProcessing UserStatus = "processing"
 )
 
 func (s UserStatus) IsValid() bool {
@@ -27,12 +30,12 @@ func (s UserStatus) String() string {
 }
 
 type User struct {
-	ID          int64                `db:"id" json:"id"`
-	Name        string               `db:"name" json:"name"`
-	Description string               `db:"description" json:"description"`
-	Status      UserStatus `db:"status" json:"status"`
-	CreatedAt   time.Time            `db:"created_at" json:"created_at"`
-	UpdatedAt   time.Time            `db:"updated_at" json:"updated_at"`
+	ID        int64      `db:"id" json:"id"`
+	UserUUID  string     `db:"user_uuid" json:"user_uuid"`
+	Name      string     `db:"name" json:"name"`
+	Status    UserStatus `db:"status" json:"status"`
+	CreatedAt time.Time  `db:"created_at" json:"created_at"`
+	UpdatedAt time.Time  `db:"updated_at" json:"updated_at"`
 }
 
 func (e *User) IsActive() bool {

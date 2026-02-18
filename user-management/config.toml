@@ -23,3 +23,15 @@ retry_backoff = "2s"
 host = "127.0.0.1:7233"
 namespace = ""
 queue_name = "user-management-queue"
+
+[redis]
+host = "localhost"
+port = 6379
+password = ""
+db = 0
+max_retries = 3
+pool_size = 10
+min_idle_conns = 5
+dial_timeout = "5s"
+read_timeout = "3s"
+write_timeout = "3s"

@@ -8,13 +8,13 @@ import (
 )
 
 type UserResponse struct {
-	ID          int64                        `json:"id"`
-	Name        string                       `json:"name"`
-	Description string                       `json:"description"`
-	Status      entity.UserStatus `json:"status"`
-	CreatedAt   time.Time                    `json:"created_at"`
-	UpdatedAt   time.Time                    `json:"updated_at"`
-	IsActive    bool                         `json:"is_active"`
+	ID        int64             `json:"id"`
+	UserUUID  string            `json:"user_uuid"`
+	Name      string            `json:"name"`
+	Status    entity.UserStatus `json:"status"`
+	CreatedAt time.Time         `json:"created_at"`
+	UpdatedAt time.Time         `json:"updated_at"`
+	IsActive  bool              `json:"is_active"`
 }
 
 type UserDetailResponse struct {
@@ -22,8 +22,8 @@ type UserDetailResponse struct {
 }
 
 type CreateUserResponse struct {
-	ID      int64  `json:"id"`
-	Message string `json:"message"`
+	ReferenceID string             `json:"reference_id"`
+	User        UserDetailResponse `json:"user"`
 }
 
 type UpdateUserResponse struct {
@@ -33,8 +33,8 @@ type UpdateUserResponse struct {
 }
 
 type UserListResponse struct {
-	Users []UserResponse `json:"users"`
-	Pagination         PaginationMetadata           `json:"pagination"`
+	Users      []UserResponse     `json:"users"`
+	Pagination PaginationMetadata `json:"pagination"`
 }
 
 type BulkUserResponse struct {

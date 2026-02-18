@@ -9,10 +9,19 @@ import (
 )
 
 type User struct {
-	ID          int64          `db:"id" json:"id"`
-	Name        string         `db:"name" json:"name"`
-	Description sql.NullString `db:"description" json:"description"`
-	Status      string         `db:"status" json:"status"`
-	CreatedAt   sql.NullTime   `db:"created_at" json:"created_at"`
-	UpdatedAt   sql.NullTime   `db:"updated_at" json:"updated_at"`
+	ID        int64        `db:"id" json:"id"`
+	UserUuid  string       `db:"user_uuid" json:"user_uuid"`
+	Name      string       `db:"name" json:"name"`
+	Status    string       `db:"status" json:"status"`
+	CreatedAt sql.NullTime `db:"created_at" json:"created_at"`
+	UpdatedAt sql.NullTime `db:"updated_at" json:"updated_at"`
+}
+
+type UserRestriction struct {
+	ID              int64        `db:"id" json:"id"`
+	UserUuid        string       `db:"user_uuid" json:"user_uuid"`
+	RestrictionCode string       `db:"restriction_code" json:"restriction_code"`
+	Status          string       `db:"status" json:"status"`
+	CreatedAt       sql.NullTime `db:"created_at" json:"created_at"`
+	UpdatedAt       sql.NullTime `db:"updated_at" json:"updated_at"`
 }
