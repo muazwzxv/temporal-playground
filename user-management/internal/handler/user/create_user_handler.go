@@ -35,9 +35,5 @@ func (h *UserHandler) CreateUser(c *fiber.Ctx) error {
 		return response.HandleError(c, err)
 	}
 
-	logger.Infow("user created successfully",
-		"id", result.ID,
-		"name", result.Name)
-
-	return c.Status(fiber.StatusCreated).JSON(result)
+	return c.Status(fiber.StatusOK).JSON(result)
 }

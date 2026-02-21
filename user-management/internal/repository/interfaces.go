@@ -5,6 +5,7 @@ import (
 	"context"
 
 	"github.com/muazwzxv/user-management/internal/entity"
+	"github.com/samber/do/v2"
 )
 
 type UserRepository interface {
@@ -15,4 +16,9 @@ type UserRepository interface {
 type DatabaseRepository interface {
 	Ping(ctx context.Context) error
 	Close() error
+}
+
+func InjectRepository(i do.Injector) {
+	// Provide repositories
+	do.Provide(i, NewUserRepository)
 }

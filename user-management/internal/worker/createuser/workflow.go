@@ -1,11 +1,9 @@
-package user
+package createuser
 
 import (
 	"time"
 
-	"github.com/samber/do/v2"
 	"go.temporal.io/sdk/temporal"
-	temporalWorker "go.temporal.io/sdk/worker"
 	"go.temporal.io/sdk/workflow"
 )
 
@@ -63,19 +61,4 @@ func CreateUserWorkflow(ctx workflow.Context, input CreateUserInput) (*CreateUse
 	}
 
 	return &output, nil
-}
-
-type UserWorkflowRegistrar struct {
-	activities *Activities
-}
-
-func NewUserWorkflowRegistrar(i do.Injector) (*UserWorkflowRegistrar, error) {
-	return &UserWorkflowRegistrar{
-		activities: NewActivities(i),
-	}, nil
-}
-
-func (r *UserWorkflowRegistrar) Register(w temporalWorker.Worker) {
-	w.RegisterWorkflow(CreateUserWorkflow)
-	w.RegisterActivity(r.activities)
 }

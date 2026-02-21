@@ -8,7 +8,6 @@ import (
 )
 
 type UserResponse struct {
-	ID        int64             `json:"id"`
 	UserUUID  string            `json:"user_uuid"`
 	Name      string            `json:"name"`
 	Status    entity.UserStatus `json:"status"`
@@ -22,8 +21,8 @@ type UserDetailResponse struct {
 }
 
 type CreateUserResponse struct {
-	ReferenceID string             `json:"reference_id"`
-	User        UserDetailResponse `json:"user"`
+	ReferenceID string       `json:"reference_id"`
+	User        UserResponse `json:"user"`
 }
 
 type UpdateUserResponse struct {

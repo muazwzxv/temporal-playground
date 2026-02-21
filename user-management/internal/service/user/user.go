@@ -8,5 +8,5 @@ import (
 )
 
 type UserService interface {
-	CreateUser(ctx context.Context, req request.CreateUserRequest) (*response.UserResponse, error)
+	CreateUser(ctx context.Context, req request.CreateUserRequest) (*response.CreateUserResponse, error)
 }
