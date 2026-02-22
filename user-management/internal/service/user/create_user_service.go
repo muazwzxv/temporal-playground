@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/gofiber/fiber/v2/log"
+	"github.com/muazwzxv/user-management/internal/config"
 	"github.com/muazwzxv/user-management/internal/dto/cache"
 	"github.com/muazwzxv/user-management/internal/dto/request"
 	"github.com/muazwzxv/user-management/internal/dto/response"
@@ -20,17 +21,20 @@ import (
 )
 
 type UserServiceImpl struct {
+	cfg         *config.Config
 	repo        repository.UserRepository
 	redisClient *redis.Client
 	temporalWf  *worker.Worker
 }
 
 func NewUserService(i do.Injector) (UserService, error) {
+	cfg := do.MustInvoke[*config.Config](i)
 	repo := do.MustInvoke[repository.UserRepository](i)
 	redisClient := do.MustInvoke[*redis.Client](i)
 	temporalWf := do.MustInvoke[*worker.Worker](i)
 
 	return &UserServiceImpl{
+		cfg:         cfg,
 		repo:        repo,
 		redisClient: redisClient,
 		temporalWf:  temporalWf,
@@ -54,9 +58,10 @@ func (s *UserServiceImpl) CreateUser(ctx context.Context, req request.CreateUser
 		}
 		return &response.CreateUserResponse{
 			ReferenceID: req.ReferenceID,
-			User: response.UserResponse{
-				Name:   cacheResp.Name,
-				Status: entity.UserStatus(cacheResp.Status),
+			User: &response.UserResponse{
+				UserUUID: cacheResp.UserUUID,
+				Name:     cacheResp.Name,
+				Status:   entity.UserStatus(cacheResp.Status),
 			},
 		}, nil
 	}
@@ -65,15 +70,16 @@ func (s *UserServiceImpl) CreateUser(ctx context.Context, req request.CreateUser
 		Name:   req.Name,
 		Status: string(entity.UserStatusProcessing),
 	}
+	cacheData, _ := json.Marshal(cacheResp)
 
-	if setErr := s.redisClient.Set(ctx, req.ReferenceID, cacheResp, time.Duration(7*time.Hour)); setErr != nil {
+	if setErr := s.redisClient.Set(ctx, req.ReferenceID, cacheData, time.Duration(7*time.Hour)); setErr != nil {
 		log.Errorw("error redis Set, error: %+v", err)
 		return nil, response.BuildError(http.StatusInternalServerError, "INTERNAL")
 	}
 
 	opts := client.StartWorkflowOptions{
 		ID:        req.ReferenceID,
-		TaskQueue: "", // TODO: fill this in
+		TaskQueue: s.cfg.Temporal.QueueName,
 	}
 	we, wfErr := s.temporalWf.Client().ExecuteWorkflow(ctx, opts, createuser.CreateUserWorkflow, createuser.CreateUserInput{
 		ReferenceID: req.ReferenceID,
@@ -94,10 +100,8 @@ func (s *UserServiceImpl) CreateUser(ctx context.Context, req request.CreateUser
 
 func (s *UserServiceImpl) entityToResponse(item *entity.User) *response.UserResponse {
 	return &response.UserResponse{
-		UserUUID:  item.UserUUID,
-		Name:      item.Name,
-		Status:    item.Status,
-		CreatedAt: item.CreatedAt,
-		UpdatedAt: item.UpdatedAt,
+		UserUUID: item.UserUUID,
+		Name:     item.Name,
+		Status:   item.Status,
 	}
 }

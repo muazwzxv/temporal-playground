@@ -2,18 +2,14 @@
 package response
 
 import (
-	"time"
-
 	"github.com/muazwzxv/user-management/internal/entity"
 )
 
 type UserResponse struct {
-	UserUUID  string            `json:"user_uuid"`
-	Name      string            `json:"name"`
-	Status    entity.UserStatus `json:"status"`
-	CreatedAt time.Time         `json:"created_at"`
-	UpdatedAt time.Time         `json:"updated_at"`
-	IsActive  bool              `json:"is_active"`
+	UserUUID string            `json:"user_uuid"`
+	Name     string            `json:"name"`
+	Status   entity.UserStatus `json:"status"`
+	IsActive bool              `json:"is_active,omitempty"`
 }
 
 type UserDetailResponse struct {
@@ -21,8 +17,8 @@ type UserDetailResponse struct {
 }
 
 type CreateUserResponse struct {
-	ReferenceID string       `json:"reference_id"`
-	User        UserResponse `json:"user"`
+	ReferenceID string        `json:"reference_id"`
+	User        *UserResponse `json:"user,omitempty"`
 }
 
 type UpdateUserResponse struct {
