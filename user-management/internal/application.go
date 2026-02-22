@@ -10,9 +10,7 @@ import (
 	"github.com/gofiber/fiber/v2"
 	"github.com/gofiber/fiber/v2/log"
 	"github.com/muazwzxv/user-management/internal/config"
-	healthHandler "github.com/muazwzxv/user-management/internal/handler/health"
-	userHandler "github.com/muazwzxv/user-management/internal/handler/user"
-	"github.com/muazwzxv/user-management/internal/redis"
+	"github.com/muazwzxv/user-management/internal/handler"
 	"github.com/muazwzxv/user-management/internal/repository"
 	"github.com/muazwzxv/user-management/internal/service"
 	"github.com/muazwzxv/user-management/internal/worker"
@@ -29,7 +27,6 @@ type Application struct {
 
 // NewApplication creates a new application with all dependencies wired via DI container
 func NewApplication(cfg *config.Config) (*Application, error) {
-	// Set log level from config
 	if err := setLogLevel(cfg.Server.LogLevel); err != nil {
 		return nil, fmt.Errorf("invalid log level: %w", err)
 	}
@@ -41,32 +38,22 @@ func NewApplication(cfg *config.Config) (*Application, error) {
 		"database_port", cfg.Database.Port,
 		"log_level", cfg.Server.LogLevel)
 
-	// Create DI container
 	injector := do.New()
 
-	// Provide configuration as a value (not lazy-loaded)
 	do.ProvideValue(injector, cfg)
 
 	// Provide infrastructure components
-	do.Provide(injector, NewDatabase)
 	do.Provide(injector, NewFiberApp)
+	do.Provide(injector, NewDatabase)
 	do.Provide(injector, NewQueries)
 	do.Provide(injector, NewRedis)
 
-	worker.InjectWorkflow(injector)
-	repository.InjectRepository(injector)
-	service.InjectServices(injector)
-
-	// Provide handlers
-	do.Provide(injector, healthHandler.NewHealthHandler)
-	do.Provide(injector, userHandler.NewUserHandler)
-
 	app := do.MustInvoke[*fiber.App](injector)
 
-	do.MustInvoke[*redis.Client](injector)
-
-	// Register all routes
-	RegisterRoutes(app, injector)
+	repository.InjectRepository(injector)
+	service.InjectServices(injector)
+	worker.InjectWorkflow(injector)
+	handler.InjectHandler(injector, app)
 
 	log.Infow("application initialized successfully",
 		"di_enabled", true,
@@ -77,13 +64,6 @@ func NewApplication(cfg *config.Config) (*Application, error) {
 		app:      app,
 		config:   cfg,
 	}, nil
-}
-
-// RegisterRoutes registers all HTTP routes by invoking handlers from DI container
-func RegisterRoutes(app *fiber.App, injector do.Injector) {
-	// Invoke handlers from DI container and register their routes
-	do.MustInvoke[*healthHandler.HealthHandler](injector).RegisterRoutes(app)
-	do.MustInvoke[*userHandler.UserHandler](injector).RegisterRoutes(app)
 }
 
 type RunMode string

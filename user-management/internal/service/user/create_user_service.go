@@ -21,13 +21,13 @@ import (
 
 type UserServiceImpl struct {
 	repo        repository.UserRepository
-	redisClient redis.Client
+	redisClient *redis.Client
 	temporalWf  *worker.Worker
 }
 
 func NewUserService(i do.Injector) (UserService, error) {
 	repo := do.MustInvoke[repository.UserRepository](i)
-	redisClient := do.MustInvoke[redis.Client](i)
+	redisClient := do.MustInvoke[*redis.Client](i)
 	temporalWf := do.MustInvoke[*worker.Worker](i)
 
 	return &UserServiceImpl{
