@@ -3,6 +3,8 @@ package createuser
 import (
 	"time"
 
+	"github.com/google/uuid"
+	"github.com/muazwzxv/user-management/internal/entity"
 	"go.temporal.io/sdk/temporal"
 	"go.temporal.io/sdk/workflow"
 )
@@ -29,8 +31,13 @@ func CreateUserWorkflow(ctx workflow.Context, input CreateUserInput) (*CreateUse
 	var activities *Activities
 
 	// Create user in database
+	insertInput := &insertUserInput{
+		uuid:   uuid.NewString(),
+		name:   input.Name,
+		status: entity.UserStatusActive,
+	}
 	var output CreateUserOutput
-	err := workflow.ExecuteActivity(ctx, activities.CreateUserInDB, input).Get(ctx, &output)
+	err := workflow.ExecuteActivity(ctx, activities.CreateUserInDB, insertInput).Get(ctx, &output)
 	if err != nil {
 		logger.Error("failed to create user in database", "error", err)
 
@@ -41,6 +48,7 @@ func CreateUserWorkflow(ctx workflow.Context, input CreateUserInput) (*CreateUse
 			ErrorMessage: err.Error(),
 		}).Get(ctx, nil)
 		if cacheErr != nil {
+			// supress err but log
 			logger.Warn("failed to update cache with failure status", "error", cacheErr)
 		}
 

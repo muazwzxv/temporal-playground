@@ -3,20 +3,25 @@ package createuser
 import (
 	"context"
 
-	"github.com/google/uuid"
 	"github.com/muazwzxv/user-management/internal/entity"
+	"go.temporal.io/sdk/temporal"
 )
 
-func (a *Activities) CreateUserInDB(ctx context.Context, input CreateUserInput) (*CreateUserOutput, error) {
+type insertUserInput struct {
+	uuid   string
+	name   string
+	status entity.UserStatus
+}
+
+func (a *Activities) CreateUserInDB(ctx context.Context, in insertUserInput) (*CreateUserOutput, error) {
 	user := &entity.User{
-		UserUUID: uuid.New().String(),
-		Name:     input.Name,
-		Status:   entity.UserStatusActive,
+		UserUUID: in.uuid,
+		Name:     in.name,
+		Status:   in.status,
 	}
 
 	if err := a.repo.Create(ctx, user); err != nil {
-		// TODO: Inspect error type to determine if it's permanent or transient
-		return nil, err
+		return nil, temporal.NewApplicationErrorWithCause("error inserting user", "DB_ERROR", err)
 	}
 
 	return &CreateUserOutput{
