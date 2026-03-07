@@ -1,0 +1,14 @@
+{
+    "context_servers": {
+        "encore-mcp": {
+            "args": [
+                "mcp",
+                "run",
+                "--app=divws"
+            ],
+            "command": "encore",
+            "env": {},
+            "source": "custom"
+        }
+    }
+}
